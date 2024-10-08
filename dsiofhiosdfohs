@@ -1,0 +1,160 @@
+-- Ensure the LPH-related functions are properly defined if not already
+if not LPHOBFUSCATED then
+    getfenv().LPH_NO_VIRTUALIZE = function(func) return func end
+    getfenv().LPH_JIT_MAX = function(func) return func end
+end
+
+LPH_JIT_MAX(function()
+    local Hooks, Targets, Whitelisted = {}, {}, {
+        {655, 775, 724, 633, 891},
+        {760, 760, 771, 665, 898},
+        {660, 759, 751, 863, 771},
+    }
+
+    -- Function to compare the equality of two tables
+    local function AreTablesEqual(a, b)
+        if #a ~= #b then return false end
+        for i, v in ipairs(a) do
+            if b[i] ~= v then return false end
+        end
+        return true
+    end
+
+    LPH_NO_VIRTUALIZE(function()
+        -- Scan garbage collected objects for target functions and metatables
+        for _, obj in ipairs(getgc(true)) do
+            if type(obj) == "function" then
+                local scriptSource, lineNumber = debug.info(obj, "sl")
+                if scriptSource:find("PlayerModule.LocalScript") and table.find({42, 51, 61}, lineNumber) then
+                    table.insert(Targets, obj)
+                end
+            elseif type(obj) == "table" and rawlen(obj) == 19 and getrawmetatable(obj) then
+                Targets.call = rawget(getrawmetatable(obj), "__call")
+            end
+        end
+    end)()
+
+    -- Validate that all necessary targets are found
+    if not (Targets[1] and Targets[2] and Targets[3] and Targets.call) then
+        warn("Bypass initialization failed")
+        return
+    end
+
+    local scriptIdentifier = debug.info(Targets[1], "s")
+
+    -- Hook the debug.info function to return the spoofed script path
+    Hooks.debug_info = hookfunction(debug.info, LPH_NO_VIRTUALIZE(function(...)
+        local args = {...}
+        if not checkcaller() and AreTablesEqual(args, {2, "s"}) then
+            return scriptIdentifier
+        end
+        return Hooks.debug_info(...)
+    end))
+
+    -- Neutralize the identified functions by hooking them to empty functions
+    for i = 1, 3 do
+        hookfunction(Targets[i], LPH_NO_VIRTUALIZE(function() end))
+    end
+
+    -- Hook the call metamethod to allow only whitelisted calls
+    Hooks.call = hookfunction(Targets.call, LPH_NO_VIRTUALIZE(function(self, ...)
+        local callArgs = {...}
+        for _, whitelist in ipairs(Whitelisted) do
+            if AreTablesEqual(whitelist, callArgs) then
+                return Hooks.call(self, ...)
+            end
+        end
+    end))
+
+    task.wait(3)
+end)()
+
+local yonath = loadstring(game:HttpGet("https://raw.githubusercontent.com/ydntsdfprnartytva/sourcead/refs/heads/main/sourcea"))()
+
+local tab1 = yonath:CreateTab("Catching")
+local sec1 = tab1:CreateSection("Main")
+
+sec1:CreateToggle("Aimbot", function(enabled)
+    local workspaceService = game:GetService("Workspace")
+    local runService = game:GetService("RunService")
+
+    local function createHitbox(part)
+        local hitbox = Instance.new("Part")
+        hitbox.Size = part.Size * 1.2
+        hitbox.CFrame = part.CFrame
+        hitbox.Transparency = 0.6
+        hitbox.Color = Color3.new(0, 1, 0)
+        hitbox.CanCollide = false
+        hitbox.Anchored = true
+        hitbox.Parent = workspaceService
+
+        local conn
+        conn = runService.RenderStepped:Connect(function()
+            if part and part.Parent then
+                hitbox.CFrame = part.CFrame
+            else
+                hitbox:Destroy()
+                conn:Disconnect()
+            end
+        end)
+    end
+
+    local function onChildAdded(newChild)
+        if newChild:IsA("BasePart") and newChild.Name == "Football" then
+            newChild.Size = Vector3.new(25, 25, 25)
+            newChild.CanCollide = false
+            newChild.Massless = true
+            createHitbox(newChild)
+        end
+    end
+
+    if enabled then
+        workspaceService.ChildAdded:Connect(onChildAdded)
+    end
+end)
+
+local pullVectorEnabled = false
+local pullVectorSlider = nil
+
+sec1:CreateToggle("pullvector not made yet!", function(enabled)
+    print("Aimbot:", enabled)
+    pullVectorEnabled = enabled
+    
+    if enabled and not pullVectorSlider then
+        pullVectorSlider = sec1:CreateSlider("pullvector range", 0, 25, 15, false, function(value)
+        end)
+    elseif not enabled and pullVectorSlider then
+        pullVectorSlider:Destroy()
+        pullVectorSlider = nil
+    end
+end)
+
+local tab2 = yonath:CreateTab("Physics")
+local sec2 = tab2:CreateSection("Player Features")
+
+local quickTpEnabled = false
+local userInputService = game:GetService("UserInputService")
+local inputConnection = nil
+
+sec2:CreateToggle("Quick tp", function(enabled)
+    quickTpEnabled = enabled
+
+    if enabled then
+        inputConnection = userInputService.InputBegan:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.F then
+                local player = game.Players.LocalPlayer
+                local character = player.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame + character.HumanoidRootPart.CFrame.LookVector * 2
+                end
+            end
+        end)
+    else
+        if inputConnection then
+            inputConnection:Disconnect()
+            inputConnection = nil
+        end
+    end
+
+    print("Quick Tp:", enabled)
+end)
